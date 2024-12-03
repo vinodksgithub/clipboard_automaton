@@ -1,0 +1,100 @@
+import tkinter as tk
+from tkinter import messagebox
+import pyperclip
+import time
+from threading import Thread
+
+# Function to handle user click for normal user data
+def handle_user_click(username, password, message_label):
+    # Copy the username to the clipboard
+    pyperclip.copy(username)
+    message_label.config(text=f"Copied username: {username}")
+    messagebox.showinfo("Copied", f"Copied {username} to clipboard!")
+
+    # Start a thread to wait 6 seconds, then copy the password
+    def delayed_copy():
+        time.sleep(6)
+        pyperclip.copy(password)
+        message_label.config(text=f"Password for {username} copied to clipboard!")
+
+    Thread(target=delayed_copy).start()
+
+# Read the user data and random data from the file
+def read_user_data(file_path):
+    users = {}
+    random_data = []
+    is_random_section = False
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            line = line.strip()
+            if line == "***random***":
+                is_random_section = True
+                continue
+            if is_random_section:
+                if '|' in line:
+                    random_data.append(tuple(line.split('|')))
+            elif '|' in line:
+                username, password = line.split('|')
+                users[username] = password
+
+    return users, random_data
+
+# Main function to create the form
+def create_form(file_path):
+    users, random_data = read_user_data(file_path)
+    if not users and not random_data:
+        print("No users found in the file.")
+        return
+
+    # Create the main tkinter window
+    root = tk.Tk()
+    root.title("User Selection Form")
+    root.geometry("300x300")
+    root.attributes('-topmost', True)  # Keep the window on top
+
+    # Label for displaying messages
+    message_label = tk.Label(root, text="Select a user to copy credentials", fg="blue")
+    message_label.pack(pady=10)
+
+    # Create buttons for each user
+    for username, password in users.items():
+        btn = tk.Button(root, text=username,
+                        command=lambda u=username, p=password: handle_user_click(u, p, message_label))
+        btn.pack(pady=5)
+
+    # Button to fetch random credentials cyclically
+    random_index = [0]  # Mutable container to track the index
+
+    def handle_random_click():
+        if random_data:
+            # Get the current CIF and Trans ID
+            username, password = random_data[random_index[0]]
+
+            # Copy the CIF ID immediately
+            pyperclip.copy(username)
+            message_label.config(text="CIF copied to clipboard")
+            messagebox.showinfo("Copied", "CIF copied to clipboard!")
+
+            # Start a thread to copy the Trans ID after 6 seconds
+            def delayed_trans_copy():
+                time.sleep(6)
+                pyperclip.copy(password)
+                message_label.config(text="Trans ID copied to clipboard")
+
+            Thread(target=delayed_trans_copy).start()
+
+            # Move to the next index in a cyclic manner
+            random_index[0] = (random_index[0] + 1) % len(random_data)
+        else:
+            messagebox.showerror("Error", "No random data available!")
+
+    cif_btn = tk.Button(root, text="cif_trans", command=handle_random_click)
+    cif_btn.pack(pady=10)
+
+    # Run the Tkinter event loop
+    root.mainloop()
+
+# Specify the file path to the notepad
+file_path = "user_data.txt"  # Replace with your actual file path
+create_form(file_path)
